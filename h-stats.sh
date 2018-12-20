@@ -33,22 +33,26 @@ get_miner_uptime(){
 get_total_hashes(){
         # khs is global
 	local Total=`cat $LOG_NAME | grep -a " : " | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1 |  awk '{printf $1*1000}'` 
-        #local Total=`cat $CUSTOM_LOG_BASENAME | grep -a "cycles/s" | tail -n 1 | cut -d " " -f12 | awk '{printf $1/1000}'`
         echo $Total
 }
 
-get_log_time_diff(){
-        local getLastLogTime=`tail -n 100 /var/log/miner/merit/merit.log | grep -a "cycles/s" | tail -n 1 | awk {'print $1,$2'} | sed 's/[][]//g'`
-        local logTime=`date --date="$getLastLogTime" +%s`
-        local curTime=`date +%s`
-        echo `expr $curTime - $logTime`
+get_miner_shares_ac(){
+	echo $(cat $LOG_NAME | grep -a "GPU #" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2)
 }
+
+get_miner_shares_rj(){
+	local Shares=`cat $LOG_NAME | grep -a "GPU #" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
+	local Accepted=`echo $Shares | cut -d "/" -f1`
+	local TotalShares=`echo $Shares | cut -d "/" -f2`
+	echo $((TotalShares - Accepted))
+}
+
 
 #######################
 # MAIN script body
 #######################
 
-. /hive/custom/$CUSTOM_MINER/h-manifest.conf
+. /hive/miners/custom/$CUSTOM_MINER/h-manifest.conf
 local LOG_NAME="$CUSTOM_LOG_BASENAME.log"
 
 [[ -z $GPU_COUNT_NVIDIA ]] &&
@@ -71,10 +75,8 @@ if [ "$diffTime" -lt "$maxDelay" ]; then
 	local algo="blake2b"			# algo
 
 	# A/R shares by pool
-	#local ac=$(get_miner_shares_ac)
-	#local rj=$(get_miner_shares_rj)
-#	echo ac: $ac
-#	echo rj: $rj
+	local ac=$(get_miner_shares_ac)
+	local rj=$(get_miner_shares_rj)
 
 	# make JSON
 	stats=$(jq -nc \
@@ -83,22 +85,24 @@ if [ "$diffTime" -lt "$maxDelay" ]; then
 				--argjson temp "$temp" \
 				--argjson fan "$fan" \
 				--arg uptime "$uptime" \
+       				--arg ac "$ac" --arg rj "$rj" \
 				--arg algo "$algo" \
-				'{$hs, $hs_units, $temp, $fan, $uptime, $algo}')
+                                '{$hs, $hs_units,  $temp, $fan, $uptime, ar: [$ac, $rj], algo: $algo}')
 	# total hashrate in khs
 	khs=$(get_total_hashes)
 else
 	stats=""
 	khs=0
+	echo stale
 fi
 
 # debug output
 
 
-echo gpu: $GPU_ID
+#echo gpu: $GPU_ID
 #echo temp:  $temp
 #echo fan:   $fan
-#echo stats: $stats
+#echo $stats | jq -c -M '.'
 #echo khs:   $khs
 #echo diff: $diffTime
 #echo uptime: $uptime

@@ -5,7 +5,7 @@
 [[ -z $CUSTOM_URL ]] && echo -e "${YELLOW}CUSTOM_URL is empty${NOCOLOR}" && return 1
 
 CUSTOM_ALGO=blake2b
-conf="-o ${CUSTOM_URL} -u ${CUSTOM_TEMPLATE} -l false ${CUSTOM_USER_CONFIG}"
+conf="-o ${CUSTOM_URL} -u ${CUSTOM_TEMPLATE} ${CUSTOM_USER_CONFIG}"
 
 #replace tpl values in whole file
 [[ -z $EWAL && -z $ZWAL && -z $DWAL ]] && echo -e "${RED}No WAL address is set${NOCOLOR}"

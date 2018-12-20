@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export LD_LIBRARY_PATH=/hive/lib
+
 cd `dirname $0`
 
 [ -t 1 ] && . colors
@@ -13,5 +15,5 @@ CUSTOM_LOG_BASEDIR=`dirname "$CUSTOM_LOG_BASENAME"`
 [[ ! -d $CUSTOM_LOG_BASEDIR ]] && mkdir -p $CUSTOM_LOG_BASEDIR
 
 
-./veriblock-pow $(< /hive/custom/$CUSTOM_NAME/$CUSTOM_NAME.conf) $@ 2>&1 | tee $CUSTOM_LOG_BASENAME.log
+./veriblock-pow $(< /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.conf) $@ 2>&1 | tee $CUSTOM_LOG_BASENAME.log
 
