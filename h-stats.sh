@@ -47,16 +47,16 @@ get_miner_shares_ac(){
 	   local ac=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2`
            (( ac_total=ac_total+ac))
 	done
-	echo $ac
+	echo $ac_total
 }
 
 get_miner_shares_rj(){
 	local rj_total=0
         for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-	   local Shares=`cat $LOG_NAME | grep -a "GPU #(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
+	   local Shares=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
        	   local Accepted=`echo $Shares | cut -d "/" -f1`
 	   local TotalShares=`echo $Shares | cut -d "/" -f2`
-	   local rj=`echo $((TotalShares - Accepted))`
+	   local rj=`echo $((TotalShares-Accepted))`
            (( rj_total=rj_total+rj)) 
 	done
 	echo $rj_total
