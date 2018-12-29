@@ -15,5 +15,25 @@ CUSTOM_LOG_BASEDIR=`dirname "$CUSTOM_LOG_BASENAME"`
 [[ ! -d $CUSTOM_LOG_BASEDIR ]] && mkdir -p $CUSTOM_LOG_BASEDIR
 
 
-./veriblock-pow $(< /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.conf) $@ 2>&1 | tee $CUSTOM_LOG_BASENAME.log
+
+conf1="$(cat /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.conf)"
+devices="$(echo $conf1 | awk 'match($0,/-d [0-9]+(\,[0-9]+)+?/) {print substr($0, RSTART, RLENGTH)}')"
+device_string="$(echo $devices | cut -d " " -f2)"
+device_array=(`echo $device_string | sed 's/,/\n/g'`)
+
+counter=0
+for i in "${device_array[@]}"
+do
+  if (($counter > 0))
+then
+    device_conf="${conf1/$devices/-d $i}"
+    echo "./veriblock-pow $device_conf -l false | tee $CUSTOM_LOG_BASENAME.log" > /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.$i.sh
+    chmod a+x /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.$i.sh	
+    screen -X screen -t VERIBLOCK-$i ./$CUSTOM_NAME.$i.sh
+fi    
+    let counter=counter+1
+done
+first_device=${device_array[0]}
+device_conf="${conf1/$devices/-d $first_device}"
+./veriblock-pow $(echo $device_conf) | tee $CUSTOM_LOG_BASENAME".log"
 

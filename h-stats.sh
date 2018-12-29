@@ -10,17 +10,17 @@ get_cards_hashes(){
 	hs=''
 	for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
 		hs[$i]=0
+        local MHS=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
+	hs[$i]=`echo $MHS`
 	done
-	local MHS=`cat $LOG_NAME | grep -a "GPU #" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
-	hs[$GPU_ID]=`echo $MHS`
 }
 
 get_nvidia_cards_temp(){
-	echo $(jq -c "[.temp$nvidia_indexes_array]" <<< $gpu_stats)
+        echo $(jq -c "[.temp$nvidia_indexes_array]" <<< $gpu_stats)
 }
 
 get_nvidia_cards_fan(){
-	echo $(jq -c "[.fan$nvidia_indexes_array]" <<< $gpu_stats)
+        echo $(jq -c "[.fan$nvidia_indexes_array]" <<< $gpu_stats)
 }
 
 get_miner_uptime(){
@@ -32,19 +32,34 @@ get_miner_uptime(){
 
 get_total_hashes(){
         # khs is global
-	local Total=`cat $LOG_NAME | grep -a " : " | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1 |  awk '{printf $1*1000}'` 
-        echo $Total
+        local Total=0
+        for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
+             local num=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
+             (( Total=Total+${num%%.*} ))
+        done
+        echo $(( Total * 1000))
+ 
 }
 
 get_miner_shares_ac(){
-	echo $(cat $LOG_NAME | grep -a "GPU #" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2)
+	local ac_total=0
+        for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
+	   local ac=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2`
+           (( ac_total=ac_total+ac))
+	done
+	echo $ac
 }
 
 get_miner_shares_rj(){
-	local Shares=`cat $LOG_NAME | grep -a "GPU #" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
-	local Accepted=`echo $Shares | cut -d "/" -f1`
-	local TotalShares=`echo $Shares | cut -d "/" -f2`
-	echo $((TotalShares - Accepted))
+	local rj_total=0
+        for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
+	   local Shares=`cat $LOG_NAME | grep -a "GPU #(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
+       	   local Accepted=`echo $Shares | cut -d "/" -f1`
+	   local TotalShares=`echo $Shares | cut -d "/" -f2`
+	   local rj=`echo $((TotalShares - Accepted))`
+           (( rj_total=rj_total+rj)) 
+	done
+	echo $rj_total
 }
 
 
@@ -76,6 +91,10 @@ if [ "$diffTime" -lt "$maxDelay" ]; then
 
 	# A/R shares by pool
 	local ac=$(get_miner_shares_ac)
+#        for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
+        #     local temp_ac $(cat $LOG_NAME | grep -a "GPU #(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2)
+        #     ac+=($temp_ac)
+        #done
 	local rj=$(get_miner_shares_rj)
 
 	# make JSON
@@ -90,6 +109,9 @@ if [ "$diffTime" -lt "$maxDelay" ]; then
                                 '{$hs, $hs_units,  $temp, $fan, $uptime, ar: [$ac, $rj], algo: $algo}')
 	# total hashrate in khs
 	khs=$(get_total_hashes)
+#	khs="1000000"
+# khs="`echo $(( ${hs[1]} * 1000 ))`"
+
 else
 	stats=""
 	khs=0
