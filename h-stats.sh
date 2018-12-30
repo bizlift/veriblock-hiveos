@@ -74,8 +74,8 @@ local LOG_NAME="$CUSTOM_LOG_BASENAME.log"
 	GPU_COUNT_NVIDIA=`gpu-detect NVIDIA`
 
 #No timestamps in CUDA Miner log, so using tail to grab only the most recent log lines to detect if a device goes offline
-TAIL_LENGTH=$((GPU_COUNT_NVIDIA*10))
-TOTAL_TAIL_LENGTH=$((GPU_COUNT_NVIDIA*12)) #A little bit longer for rigs with many devices filling up log
+TAIL_LENGTH=$((GPU_COUNT_NVIDIA*20))
+TOTAL_TAIL_LENGTH=$((GPU_COUNT_NVIDIA*30)) #A little bit longer for rigs with many devices filling up log
 
 local GPU_ID=`cat $CUSTOM_CONFIG_FILENAME | awk 'match($0, /-d [0-9]+/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f2`
 
