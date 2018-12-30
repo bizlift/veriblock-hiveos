@@ -9,10 +9,22 @@ get_cards_hashes(){
 	# hs is global
 	hs=''
 	for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-		hs[$i]=0
-        local MHS=`tail -n $TAIL_LENGTH $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
-	hs[$i]=`echo $MHS`
+		hs[$i]=''
+                if is_log_fresh $i; then
+                     local MHS=`tail -n $TAIL_LENGTH $CUSTOM_LOG_BASENAME.$i.log | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
+	             hs[$i]=`echo $MHS`
+                fi
 	done
+}
+
+is_log_fresh(){
+        lastUpdate="$(stat -c %Y $CUSTOM_LOG_BASENAME.$1.log)"
+        now="$(date +%s)"
+        local diffTime="${now}"
+        let diffTime="${now}-${lastUpdate}"
+        local maxDelay=60
+        [[ "$diffTime" -lt "$maxDelay" ]] && return
+        false
 }
 
 get_nvidia_cards_temp(){
@@ -34,8 +46,10 @@ get_total_hashes(){
         # khs is global
         local Total=0
         for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-             local num=`tail -n $TOTAL_TAIL_LENGTH $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
-             (( Total=Total+${num%%.*} ))
+             if is_log_fresh $i; then
+                 local num=`tail -n $TOTAL_TAIL_LENGTH $CUSTOM_LOG_BASENAME.$i.log | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
+                 (( Total=Total+${num%%.*} ))
+             fi
         done
         echo $(( Total * 1000))
  
@@ -44,7 +58,7 @@ get_total_hashes(){
 get_miner_shares_ac(){
 	local ac_total=0
         for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-	   local ac=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2`
+	   local ac=`cat $CUSTOM_LOG_BASENAME.$i.log | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2`
            (( ac_total=ac_total+ac))
 	done
 	echo $ac_total
@@ -53,7 +67,7 @@ get_miner_shares_ac(){
 get_miner_shares_rj(){
 	local rj_total=0
         for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-	   local Shares=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
+	   local Shares=`cat $CUSTOM_LOG_BASENAME.$i.log | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+\/[0-9]+/) {print substr($0, RSTART, RLENGTH)}' | cut -d " " -f2`
        	   local Accepted=`echo $Shares | cut -d "/" -f1`
 	   local TotalShares=`echo $Shares | cut -d "/" -f2`
 	   local rj=`echo $((TotalShares-Accepted))`
@@ -76,11 +90,13 @@ local LOG_NAME="$CUSTOM_LOG_BASENAME.log"
 #No timestamps in CUDA Miner log, so using tail to grab only the most recent log lines to detect if a device goes offline
 TAIL_LENGTH=$((GPU_COUNT_NVIDIA*20))
 TOTAL_TAIL_LENGTH=$((GPU_COUNT_NVIDIA*30)) #A little bit longer for rigs with many devices filling up log
+#Tail lengths no longer needed as each GPU instance has it's own log now.
+#Timeout is based on individual log timetamp, so TAIL_LENGTH will be cleaned up next release.
 
 local GPU_ID=`cat $CUSTOM_CONFIG_FILENAME | awk 'match($0, /-d [0-9]+/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f2`
 
 # Calc log freshness by logfile timestamp since no time entries in log
-lastUpdate="$(stat -c %Y $CUSTOM_LOG_BASENAME.log)"
+lastUpdate="$(stat -c %Y $CUSTOM_LOG_BASENAME.0.log)"
 now="$(date +%s)"
 local diffTime="${now}"
 let diffTime="${now}-${lastUpdate}"
