@@ -10,7 +10,7 @@ get_cards_hashes(){
 	hs=''
 	for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
 		hs[$i]=0
-        local MHS=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
+        local MHS=`tail -n $TAIL_LENGTH $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
 	hs[$i]=`echo $MHS`
 	done
 }
@@ -34,7 +34,7 @@ get_total_hashes(){
         # khs is global
         local Total=0
         for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-             local num=`cat $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
+             local num=`tail -n $TOTAL_TAIL_LENGTH $LOG_NAME | grep -a "GPU #$(echo $i)" | tail -n 1 | awk 'match($0, /[0-9]+.[0-9]+ MH/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f1`
              (( Total=Total+${num%%.*} ))
         done
         echo $(( Total * 1000))
@@ -73,11 +73,18 @@ local LOG_NAME="$CUSTOM_LOG_BASENAME.log"
 [[ -z $GPU_COUNT_NVIDIA ]] &&
 	GPU_COUNT_NVIDIA=`gpu-detect NVIDIA`
 
+#No timestamps in CUDA Miner log, so using tail to grab only the most recent log lines to detect if a device goes offline
+TAIL_LENGTH=$((GPU_COUNT_NVIDIA*10))
+TOTAL_TAIL_LENGTH=$((GPU_COUNT_NVIDIA*12)) #A little bit longer for rigs with many devices filling up log
+
 local GPU_ID=`cat $CUSTOM_CONFIG_FILENAME | awk 'match($0, /-d [0-9]+/) {print substr($0, RSTART, RLENGTH)}'|  cut -d " " -f2`
 
-# Calc log freshness
-local diffTime=110
-local maxDelay=120
+# Calc log freshness by logfile timestamp since no time entries in log
+lastUpdate="$(stat -c %Y $CUSTOM_LOG_BASENAME.log)"
+now="$(date +%s)"
+local diffTime="${now}"
+let diffTime="${now}-${lastUpdate}"
+local maxDelay=60 
 
 # If log is fresh the calc miner stats or set to null if not
 if [ "$diffTime" -lt "$maxDelay" ]; then
@@ -91,10 +98,6 @@ if [ "$diffTime" -lt "$maxDelay" ]; then
 
 	# A/R shares by pool
 	local ac=$(get_miner_shares_ac)
-#        for (( i=0; i < ${GPU_COUNT_NVIDIA}; i++ )); do
-        #     local temp_ac $(cat $LOG_NAME | grep -a "GPU #(echo $i)" | tail -n 1 | awk 'match($0, /shares: [0-9]+/) {print substr($0, RSTART, RLENGTH)}'| cut -d " " -f2)
-        #     ac+=($temp_ac)
-        #done
 	local rj=$(get_miner_shares_rj)
 
 	# make JSON
@@ -109,9 +112,6 @@ if [ "$diffTime" -lt "$maxDelay" ]; then
                                 '{$hs, $hs_units,  $temp, $fan, $uptime, ar: [$ac, $rj], algo: $algo}')
 	# total hashrate in khs
 	khs=$(get_total_hashes)
-#	khs="1000000"
-# khs="`echo $(( ${hs[1]} * 1000 ))`"
-
 else
 	stats=""
 	khs=0

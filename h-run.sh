@@ -27,9 +27,10 @@ do
   if (($counter > 0))
 then
     device_conf="${conf1/$devices/-d $i}"
-    echo "./veriblock-pow $device_conf -l false | tee $CUSTOM_LOG_BASENAME.log" > /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.$i.sh
+    echo "/hive/miners/custom/$CUSTOM_NAME/veriblock-pow $device_conf | tee $CUSTOM_LOG_BASENAME.log" > /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.$i.sh
     chmod a+x /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.$i.sh	
-    screen -X screen -t VERIBLOCK-$i ./$CUSTOM_NAME.$i.sh
+    sleep 1
+    screen -X screen -t VERIBLOCK-$i /hive/miners/custom/$CUSTOM_NAME/$CUSTOM_NAME.$i.sh
 fi    
     let counter=counter+1
 done
